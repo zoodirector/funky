@@ -259,6 +259,29 @@
   background-color: var(--accent);
 }
 
+.dropzone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* Numbered steps; the base reset takes list markers off every ol. */
+.steps {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  color: var(--muted-foreground);
+}
+
+.steps li {
+  margin-bottom: 0.25rem;
+}
+
+.steps li::marker {
+  font-variant-numeric: tabular-nums;
+}
+
 .report-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

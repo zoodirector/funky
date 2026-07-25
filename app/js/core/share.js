@@ -5,8 +5,15 @@
  * system share sheet — Signal, WhatsApp, mail, whatever is installed. Desktop
  * browsers mostly cannot share files, so we fall back to a download.
  *
- * In: a file picker, drag-and-drop, and (when the app is installed) files
- * opened directly from the OS via the manifest's file_handlers.
+ * In: a file picker, drag-and-drop, the clipboard, and (when the app is
+ * installed) files opened directly from the OS via the manifest's
+ * file_handlers.
+ *
+ * Coming back in is the harder direction on iOS. WebKit has never shipped the
+ * Web Share Target API (webkit.org/b/194593, open since 2019), so a home screen
+ * app cannot list itself in the share sheet and `file_handlers` does nothing
+ * there either. A deck that arrives in a messenger has to be saved to Files
+ * first, or come through the clipboard.
  */
 
 import { exportFilename, parsePayload, serialise } from "./codec.js";
@@ -70,6 +77,26 @@ export async function shareDeck(deck, notes, now = Date.now()) {
 export async function readDeckFile(file) {
   const text = await file.text();
   return parsePayload(text);
+}
+
+/**
+ * Read a deck out of the clipboard.
+ *
+ * Returns null when there is nothing to work with, which is the common case
+ * rather than an error: Safari only allows readText() inside a user gesture and
+ * then puts a native "Paste" confirmation in front of it that the user can
+ * decline. Callers fall back to asking for a manual paste. Text that is present
+ * but is not a deck throws PayloadError, same as a bad file.
+ */
+export async function pasteDeck() {
+  if (typeof navigator === "undefined" || !navigator.clipboard?.readText) return null;
+  let text;
+  try {
+    text = await navigator.clipboard.readText();
+  } catch {
+    return null; // declined, out of gesture, or no permission
+  }
+  return text.trim() ? parsePayload(text) : null;
 }
 
 /** Open a file picker and return the parsed payload, or null if cancelled. */

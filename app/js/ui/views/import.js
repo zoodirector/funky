@@ -10,8 +10,10 @@ import { html, mount, on, pluralise } from "../dom.js";
 import { navigate } from "../router.js";
 import { setFlush, setHeader } from "../shell.js";
 import { toast, toastError } from "../components/toast.js";
+import { customDialog } from "../components/dialog.js";
 import * as store from "../../core/store.js";
-import { acceptDrops, pickDeckFile } from "../../core/share.js";
+import { acceptDrops, pasteDeck, pickDeckFile } from "../../core/share.js";
+import { parsePayload } from "../../core/codec.js";
 import { ADD_AS_NEW_DECK, MERGE_INTO_DECK, planMerge, suggestDeckAction } from "../../core/merge.js";
 
 /** Payload handed over by the OS file handler before this view existed. */
@@ -20,6 +22,67 @@ let pendingPayload = null;
 export const setPendingPayload = (payload) => {
   pendingPayload = payload;
 };
+
+/**
+ * iOS gets its own instructions because it is the one platform where a deck
+ * cannot come straight from the messenger — see the note in core/share.js.
+ * iPadOS reports itself as a Mac, hence the touch-point check.
+ */
+const isIOS =
+  typeof navigator !== "undefined" &&
+  (/iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.userAgent.includes("Macintosh") && navigator.maxTouchPoints > 1));
+
+/**
+ * Manual paste, for when the clipboard cannot be read programmatically.
+ * Resolves the parsed payload, or null if cancelled.
+ */
+async function pasteDialog() {
+  let parsed = null;
+
+  const result = await customDialog({
+    markup: html`<div class="dialog-body">
+      <h2 class="dialog-title">Paste a deck</h2>
+      <p class="dialog-desc">
+        Paste the whole deck text — it starts with <code>{</code> and ends with <code>}</code>.
+      </p>
+      <textarea
+        class="textarea"
+        rows="6"
+        data-text
+        placeholder="{ &quot;format&quot;: &quot;funky.deck&quot;, …"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
+      ></textarea>
+      <p class="field-hint" data-error hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-outline" data-cancel>Cancel</button>
+        <button type="button" class="btn btn-default" data-ok>Open deck</button>
+      </div>
+    </div>`,
+    setup(node, close) {
+      const textarea = node.querySelector("[data-text]");
+      const error = node.querySelector("[data-error]");
+      queueMicrotask(() => textarea.focus());
+
+      node.querySelector("[data-cancel]").addEventListener("click", () => close("cancel"));
+      node.querySelector("[data-ok]").addEventListener("click", () => {
+        try {
+          parsed = parsePayload(textarea.value);
+          close("ok");
+        } catch (failure) {
+          // Inline, not a toast: the text is still on screen to be corrected.
+          error.textContent = failure.message;
+          error.hidden = false;
+        }
+      });
+    },
+    // returnValue is a string, so the payload rides along in the closure.
+  });
+
+  return result === "ok" ? parsed : null;
+}
 
 export function render({ outlet }) {
   let payload = pendingPayload;
@@ -47,10 +110,34 @@ export function render({ outlet }) {
           <p class="text-sm">
             Save the <code>.json</code> file your friend sent, then choose it here.
           </p>
-          <button type="button" class="btn btn-default" data-pick style="margin-top: 0.5rem">
-            Choose file
-          </button>
+          <div class="dropzone-actions">
+            <button type="button" class="btn btn-default" data-pick>Choose file</button>
+            <button type="button" class="btn btn-outline" data-paste>Paste deck</button>
+          </div>
         </div>
+
+        ${isIOS
+          ? html`<div class="card">
+              <div class="card-body stack-sm">
+                <h2 class="card-title">Coming from a messenger?</h2>
+                <p class="text-sm muted">
+                  iPhones do not let an app added to the home screen appear in the share sheet, so
+                  Funky will not be in the list. Two steps instead:
+                </p>
+                <ol class="steps text-sm">
+                  <li>
+                    In the messenger, tap the deck file, then <strong>Share</strong> →
+                    <strong>Save to Files</strong>.
+                  </li>
+                  <li>Come back here, tap <strong>Choose file</strong>, and pick it.</li>
+                </ol>
+                <p class="text-sm muted">
+                  If the deck arrived as a message rather than a file, copy the text and use
+                  <strong>Paste deck</strong>.
+                </p>
+              </div>
+            </div>`
+          : ""}
 
         <div class="card">
           <div class="card-body stack-sm">
@@ -191,6 +278,25 @@ export function render({ outlet }) {
     }
   }
 
+  /**
+   * Try the clipboard first — one tap when it works — and fall back to a
+   * textarea when the browser will not hand it over.
+   */
+  async function paste() {
+    let parsed;
+    try {
+      parsed = await pasteDeck();
+    } catch (error) {
+      toastError(error); // clipboard held something, but not a deck
+      return;
+    }
+    parsed ??= await pasteDialog();
+    if (!parsed) return;
+    payload = parsed;
+    target = null;
+    paint();
+  }
+
   async function apply() {
     const suggestion = target;
     const targetDeckId =
@@ -230,6 +336,7 @@ export function render({ outlet }) {
   const teardowns = [
     stopDrops,
     on(outlet, "click", "[data-pick]", pick),
+    on(outlet, "click", "[data-paste]", paste),
     on(outlet, "click", "[data-apply]", apply),
     on(outlet, "click", "[data-cancel]", () => {
       payload = null;

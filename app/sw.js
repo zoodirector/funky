@@ -6,7 +6,7 @@
  * and bumping CACHE_VERSION so existing installs pick the change up.
  */
 
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const CACHE_NAME = `funky-${CACHE_VERSION}`;
 
 const SHELL = [

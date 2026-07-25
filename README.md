@@ -95,6 +95,29 @@ anything is written.
 The file is plain, pretty-printed JSON — readable and diffable, which matters
 when two people are co-authoring a deck. It contains no scheduling state.
 
+### Receiving on an iPhone
+
+Sending out works everywhere. Coming back in is where iOS is different: **Funky
+cannot appear in the share sheet**, so sharing a deck from Signal or WhatsApp
+straight into the app is not possible. That is the platform, not the app —
+WebKit has never implemented the [Web Share Target
+API](https://bugs.webkit.org/show_bug.cgi?id=194593) (filed 2019, still open),
+and `file_handlers` is Chromium-only. Nothing in a home screen web app can
+register itself as a destination for a file.
+
+So the import screen offers two ways in, and says so on iOS:
+
+- **Save to Files.** In the messenger, tap the deck file → _Share_ → _Save to
+  Files_. Then Import → _Choose file_.
+- **Paste deck.** If the deck arrived as text, copy it and tap _Paste deck_.
+  Safari asks for confirmation before handing the clipboard over; declining
+  falls back to a box to paste into by hand.
+
+If the two-step dance grates, a Shortcut gets Funky into the share sheet by
+proxy: a shortcut set to _Show in Share Sheet_ accepting files, with _Get Text
+from Input_ → _Copy to Clipboard_. Share the deck to it, open Funky, tap _Paste
+deck_. Nothing in this repository depends on it; it is one recipe among several.
+
 ## Storage
 
 Everything lives in IndexedDB in one browser on one device. There is no account
