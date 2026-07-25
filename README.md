@@ -14,7 +14,7 @@ ES modules and service workers cannot load from `file://`, so it needs a static
 file server. Any one will do:
 
 ```sh
-python3 -m http.server 8000
+python3 -m http.server 8000 --directory app
 ```
 
 Then open <http://localhost:8000>. On a phone, open `http://<your-lan-ip>:8000`
@@ -43,24 +43,28 @@ hand — see [Adding a file](#adding-a-file).
 ## How it fits together
 
 ```
-index.html            app shell
-manifest.webmanifest  installability, plus a file handler for .json decks
-sw.js                 cache-first service worker (its file list is hand-kept)
+app/                    the site — everything below this is what gets deployed
+  index.html            app shell
+  manifest.webmanifest  installability, plus a file handler for .json decks
+  sw.js                 cache-first service worker (its file list is hand-kept)
 
-css/   tokens · base · components · layout · views
-js/
-  core/               pure domain logic, no DOM
-    fsrs.js           the FSRS-5 memory model
-    scheduler.js      learning steps wrapped around FSRS
-    queue.js          study day, daily limits, what comes next
-    model.js          notes, cards, decks
-    codec.js          the deck exchange format
-    merge.js          merging a friend's deck into yours
-    db.js             IndexedDB wrapper
-    store.js          state and mutations
-    share.js          Web Share API and file import
-  ui/                 router, shell, components, one module per view
-tests/                open tests/test.html in a browser
+  css/   tokens · base · components · layout · views
+  js/
+    app.js              entry point — opens the db, registers routes, starts up
+    core/               pure domain logic, no DOM
+      fsrs.js           the FSRS-5 memory model
+      scheduler.js      learning steps wrapped around FSRS
+      queue.js          study day, daily limits, what comes next
+      model.js          notes, cards, decks
+      codec.js          the deck exchange format
+      merge.js          merging a friend's deck into yours
+      db.js             IndexedDB wrapper
+      store.js          state and mutations
+      share.js          Web Share API and file import
+    ui/                 router, shell, theme, components, one module per view
+  assets/               icon sources and the PNGs the manifest wants
+
+vocabulari/             source word lists and the script that builds decks
 ```
 
 `core/` is pure and testable; views read from `store.js` and never touch the
@@ -97,29 +101,22 @@ Everything lives in IndexedDB in one browser on one device. There is no account
 and no sync. Clearing site data deletes it, so sending a deck to a friend now and
 then is also your backup.
 
-## Tests
-
-Open `tests/test.html` in a browser — the page is the runner. It covers the pure
-modules: the FSRS formulas (against values computed independently from the
-published spec), the card state machine, queueing, the exchange format, and the
-merge convergence properties.
-
 ## Icons
 
-`assets/icon.svg` and `assets/icon-maskable.svg` are the sources. The manifest
-wants PNGs alongside them:
+`app/assets/icon.svg` and `app/assets/icon-maskable.svg` are the sources. The
+manifest wants PNGs alongside them, regenerated whenever a source changes:
 
 ```sh
-rsvg-convert -w 192 -h 192 assets/icon.svg          -o assets/icon-192.png
-rsvg-convert -w 512 -h 512 assets/icon.svg          -o assets/icon-512.png
-rsvg-convert -w 512 -h 512 assets/icon-maskable.svg -o assets/icon-maskable-512.png
+rsvg-convert -w 192 -h 192 app/assets/icon.svg          -o app/assets/icon-192.png
+rsvg-convert -w 512 -h 512 app/assets/icon.svg          -o app/assets/icon-512.png
+rsvg-convert -w 512 -h 512 app/assets/icon-maskable.svg -o app/assets/icon-maskable-512.png
 ```
 
-Until they exist the app runs normally; it just cannot be installed.
+Without them the app runs normally; it just cannot be installed.
 
 ## Adding a file
 
 There is no bundler to discover new modules, so a new `.js` or `.css` file must
-be added to the `SHELL` list in `sw.js`, and `CACHE_VERSION` bumped so existing
+be added to the `SHELL` list in `app/sw.js`, and `CACHE_VERSION` bumped so existing
 installs pick it up. That is the only manual step the no-build-step constraint
 costs.
