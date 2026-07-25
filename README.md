@@ -23,6 +23,25 @@ and use "Add to home screen".
 Nothing is compiled, bundled or minified — the files the browser loads are the
 files in this repository.
 
+## Deploying
+
+Because there is nothing to build, deploying is a file copy to any static host.
+Everything ships except this README and git's own files:
+
+```sh
+rsync -av --delete \
+  --exclude='.git' --exclude='.gitignore' --exclude='README.md' --exclude='vocabulari' \
+  ./ user@host:www/funky/
+```
+
+`--delete` is what keeps the server honest: a module deleted here has to
+disappear there too, so the served tree stays identical to the repository.
+
+The service worker takes care of itself. Its bytes change on every deploy, so
+browsers fetch the new one, and `activate` drops every cache whose name is not
+the current `CACHE_NAME`. Adding or removing a file is the one case that needs a
+hand — see [Adding a file](#adding-a-file).
+
 ## How it fits together
 
 ```
@@ -51,9 +70,9 @@ database directly.
 
 ## Two ideas worth knowing
 
-**A note is shared, a card is private.** A *note* is content — term,
+**A note is shared, a card is private.** A _note_ is content — term,
 translation, example, tags — and it is the only thing in an exported file. A
-*card* is one direction of that note (term→translation and translation→term are
+_card_ is one direction of that note (term→translation and translation→term are
 two cards) together with your scheduling state. Card ids are derived from the
 note id, so an incoming edit to a note you already have re-uses your existing
 card. **An import can never reset your progress.**
@@ -66,7 +85,7 @@ order, as often as they like.
 
 ## Sharing a deck
 
-Deck menu → *Send to a friend*. On a phone this opens the system share sheet
+Deck menu → _Send to a friend_. On a phone this opens the system share sheet
 (Signal, WhatsApp, mail); on desktop it downloads a `.json` file. The recipient
 opens **Import** and picks the file, and sees exactly what will change before
 anything is written.

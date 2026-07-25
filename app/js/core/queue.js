@@ -24,6 +24,15 @@ import {
 /** How far ahead we may pull a learning card when nothing else is waiting. */
 export const LEARN_AHEAD_MS = 20 * MINUTE;
 
+/**
+ * How long a note's cards stay out of the way after one of them was answered.
+ *
+ * Both directions of a word are created together, so they share a `due` and
+ * sort next to each other by id — without this they are asked back to back and
+ * the second one is a give-away rather than a test.
+ */
+export const SIBLING_BURY_MS = 10 * MINUTE;
+
 /** Study-day number for a timestamp, given the rollover hour. */
 export function dayIndex(now, cutoffHour = 4) {
   const shifted = new Date(now - cutoffHour * 60 * MINUTE);
@@ -54,6 +63,21 @@ const isLearningState = (card) =>
 const active = (cards) => cards.filter((c) => !c.suspended);
 
 /**
+ * Notes with a card answered within the bury window. Derived from `lastReview`
+ * rather than tracked per session, so it survives a reload and — because undo
+ * restores `lastReview` too — unwinds correctly with the answer it came from.
+ */
+function recentlyAnsweredNotes(cards, now) {
+  const notes = new Set();
+  for (const card of cards) {
+    if (card.lastReview != null && now - card.lastReview < SIBLING_BURY_MS) {
+      notes.add(card.noteId);
+    }
+  }
+  return notes;
+}
+
+/**
  * How many cards of each kind are waiting, after the daily caps.
  * `done` is today's tally for this deck: { new, reviews }.
  */
@@ -82,6 +106,11 @@ export function deckCounts(cards, now = Date.now(), settings = DEFAULT_DECK_SETT
  * material is spread through the session rather than front-loaded), then —
  * only if nothing else remains — a learning card due slightly in the future,
  * which is the usual "learn ahead" behaviour.
+ *
+ * Within the reviews-and-new step, cards of a recently answered note are held
+ * back so the two directions of a word are not asked in a row. A learning card
+ * that is due is never held back: its step is the whole point of the state, and
+ * deferring it would strand it outside the session.
  */
 export function pickNext(cards, now = Date.now(), settings = DEFAULT_DECK_SETTINGS, done = { new: 0, reviews: 0 }) {
   const cfg = { ...DEFAULT_DECK_SETTINGS, ...settings };
@@ -97,12 +126,23 @@ export function pickNext(cards, now = Date.now(), settings = DEFAULT_DECK_SETTIN
   const reviewsLeft = cfg.reviewsPerDay - done.reviews;
   const newLeft = cfg.newPerDay - done.new;
 
-  const reviewDue =
+  let reviewDue =
     reviewsLeft > 0
       ? pool.filter((c) => c.state === STATE_REVIEW && c.due <= end).sort(byDue)
       : [];
-  const newDue =
+  let newDue =
     newLeft > 0 ? pool.filter((c) => c.state === STATE_NEW).sort(byDue) : [];
+
+  // Sibling burying. Dropped rather than enforced when it would empty the
+  // queue: at the tail of a small deck there is nothing better to show, and
+  // ending the session early would be the worse surprise.
+  const buried = recentlyAnsweredNotes(pool, now);
+  const freeReviews = reviewDue.filter((c) => !buried.has(c.noteId));
+  const freeNew = newDue.filter((c) => !buried.has(c.noteId));
+  if (freeReviews.length || freeNew.length) {
+    reviewDue = freeReviews;
+    newDue = freeNew;
+  }
 
   if (reviewDue.length && newDue.length) {
     const spacing = Math.max(1, Math.round(reviewDue.length / newDue.length));
