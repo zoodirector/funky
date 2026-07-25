@@ -1,0 +1,112 @@
+/* App shell: fixed header, scrolling main, bottom tab bar. */
+
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100dvh;
+  max-width: 42rem;
+  margin-inline: auto;
+  overflow: hidden;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: calc(var(--header-height) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+  background-color: oklch(from var(--background) l c h / 0.85);
+  backdrop-filter: blur(8px);
+  position: relative;
+  z-index: 20;
+}
+
+.app-title {
+  font-size: 1rem;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.app-main {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 1rem 0.75rem 1.5rem;
+}
+
+/* Views that own their whole surface (review) opt out of the padding. */
+.app-main.is-flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.app-tabbar {
+  display: flex;
+  border-top: 1px solid var(--border);
+  background-color: var(--background);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  height: var(--tabbar-height);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  transition: color 0.15s ease;
+}
+
+.tab[aria-current="page"] {
+  color: var(--foreground);
+}
+
+.tab-icon {
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.app-tabbar.hidden {
+  display: none !important;
+}
+
+/* Page-level section scaffolding used by most views. */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.section + .section {
+  margin-top: 1.5rem;
+}
+
+.section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}

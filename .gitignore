@@ -1,0 +1,4 @@
+# No build step — nothing generated lives in this repo.
+.DS_Store
+*.local
+funky-*.json

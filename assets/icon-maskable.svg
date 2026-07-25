@@ -1,0 +1,27 @@
+<!--
+  Maskable variant: Android may crop this to a circle, squircle or squares, so
+  everything that matters sits inside the central 80% safe zone and the
+  background bleeds to the full canvas.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Funky">
+  <rect width="512" height="512" fill="#1c1c1c" />
+  <g transform="translate(256 256) scale(0.72) translate(-256 -256)">
+    <g transform="rotate(-8 256 256)">
+      <rect x="120" y="150" width="240" height="176" rx="24" fill="#4b4b4b" />
+    </g>
+    <g transform="rotate(4 256 256)">
+      <rect x="136" y="186" width="240" height="176" rx="24" fill="#fafafa" />
+      <text
+        x="256"
+        y="300"
+        font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+        font-size="108"
+        font-weight="600"
+        text-anchor="middle"
+        fill="#1c1c1c"
+      >
+        rm
+      </text>
+    </g>
+  </g>
+</svg>
