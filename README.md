@@ -26,12 +26,10 @@ files in this repository.
 ## Deploying
 
 Because there is nothing to build, deploying is a file copy to any static host.
-Everything ships except this README and git's own files:
+`app/` is the whole site, so it ships as-is:
 
 ```sh
-rsync -av --delete \
-  --exclude='.git' --exclude='.gitignore' --exclude='README.md' --exclude='vocabulari' \
-  ./ user@host:www/funky/
+rsync -av --delete app/ user@host:www/funky/
 ```
 
 `--delete` is what keeps the server honest: a module deleted here has to
