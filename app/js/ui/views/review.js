@@ -46,10 +46,21 @@ export function render({ params, outlet }) {
     );
   }
 
+  // Advances to whichever card is next due and renders it. Must only be
+  // called when actually moving on (initial load, after answering, after
+  // undo) — re-picking merely to reveal the current card's answer can select
+  // a *different* card if its due time ticked over in the meantime, which
+  // then gets answered by mistake in the reader's place.
   function paint() {
     clearTimeout(timer);
-    const now = Date.now();
     current = pick();
+    render();
+  }
+
+  // Re-renders the already-selected `current` card, e.g. to reveal its
+  // answer, without touching which card is on screen.
+  function render() {
+    const now = Date.now();
 
     if (!current) {
       paintDone(now);
@@ -203,7 +214,7 @@ export function render({ params, outlet }) {
     if (!revealed && (event.key === " " || event.key === "Enter")) {
       event.preventDefault();
       revealed = true;
-      paint();
+      render();
       return;
     }
     if (revealed) {
@@ -223,12 +234,12 @@ export function render({ params, outlet }) {
   const teardowns = [
     on(outlet, "click", "[data-show]", () => {
       revealed = true;
-      paint();
+      render();
     }),
     on(outlet, "click", "[data-stage]", () => {
       if (!revealed) {
         revealed = true;
-        paint();
+        render();
       }
     }),
     on(outlet, "click", "[data-rating]", (_event, element) =>
