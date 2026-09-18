@@ -99,34 +99,38 @@ export async function pasteDeck() {
   return text.trim() ? parsePayload(text) : null;
 }
 
-/** Open a file picker and return the parsed payload, or null if cancelled. */
-export function pickDeckFile() {
-  return new Promise((resolve, reject) => {
+/**
+ * Open a file picker and resolve the chosen File, or null if cancelled.
+ *
+ * Deliberately broad accept list: iOS greys out .json in the Files picker
+ * under a narrow one, and a deck that arrived as .txt is still a deck.
+ * Callers validate the contents regardless of what the name says.
+ */
+export function pickFile({ accept = ".json,.txt,application/json,text/plain" } = {}) {
+  return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    // Deliberately broad: iOS greys out .json in the Files picker under a
-    // narrow accept list, and a deck that arrived as .txt is still a deck.
-    // parsePayload validates the contents regardless of what the name says.
-    input.accept = ".json,.txt,application/json,text/plain";
+    input.accept = accept;
     input.hidden = true;
 
     // There is no "cancel" event with universal support; the picker simply
     // never fires change. The element is cleaned up on the next selection or
     // when the page navigates, which is good enough for a hidden input.
-    input.addEventListener("change", async () => {
+    input.addEventListener("change", () => {
       const file = input.files?.[0];
       input.remove();
-      if (!file) return resolve(null);
-      try {
-        resolve(await readDeckFile(file));
-      } catch (error) {
-        reject(error);
-      }
+      resolve(file ?? null);
     });
 
     document.body.append(input);
     input.click();
   });
+}
+
+/** Open a file picker and return the parsed payload, or null if cancelled. */
+export async function pickDeckFile() {
+  const file = await pickFile();
+  return file ? readDeckFile(file) : null;
 }
 
 /**

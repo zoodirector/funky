@@ -303,6 +303,76 @@ export async function undoLastAnswer() {
 
 export const reviewLog = () => db.getAll(db.STORE_REVLOG);
 
+/** Everything private to this device: scheduling state plus its history. */
+export async function learningStateSnapshot() {
+  return {
+    cards: [...state.cards.values()],
+    reviewLog: await reviewLog(),
+    counters: state.counters,
+  };
+}
+
+const SCHEDULING_FIELDS = [
+  "state",
+  "step",
+  "due",
+  "stability",
+  "difficulty",
+  "lastReview",
+  "reps",
+  "lapses",
+  "suspended",
+];
+
+/**
+ * Apply a learning-state backup. Only touches cards that already exist here —
+ * a card's id is derived from its note, so one with no local match belongs to
+ * a note this device does not have (or has under a different id). Review log
+ * rows are de-duplicated against what is already stored, since importing the
+ * same backup twice — a second device, a repeated restore — is the normal case.
+ */
+export async function restoreLearningState({ cards, reviewLog: incomingLog, counters }) {
+  const updatedCards = [];
+  for (const incoming of cards) {
+    const local = state.cards.get(incoming.id);
+    if (!local) continue;
+    const next = { ...local };
+    for (const field of SCHEDULING_FIELDS) next[field] = incoming[field];
+    state.cards.set(next.id, next);
+    updatedCards.push(next);
+  }
+
+  const existingLog = await reviewLog();
+  const seen = new Set(existingLog.map((e) => `${e.cardId}|${e.reviewedAt}`));
+  const newEntries = incomingLog.filter(
+    (entry) => state.cards.has(entry.cardId) && !seen.has(`${entry.cardId}|${entry.reviewedAt}`)
+  );
+
+  let mergedCounters = state.counters;
+  for (const [day, byDeck] of Object.entries(counters)) {
+    const localDay = mergedCounters[day] ?? {};
+    const nextDay = { ...localDay };
+    for (const [deckId, counts] of Object.entries(byDeck)) {
+      const localCounts = localDay[deckId] ?? { new: 0, reviews: 0 };
+      nextDay[deckId] = {
+        new: Math.max(localCounts.new, counts.new),
+        reviews: Math.max(localCounts.reviews, counts.reviews),
+      };
+    }
+    mergedCounters = { ...mergedCounters, [day]: nextDay };
+  }
+  state.counters = mergedCounters;
+
+  await Promise.all([
+    updatedCards.length ? db.putAll(db.STORE_CARDS, updatedCards) : null,
+    newEntries.length ? db.addAll(db.STORE_REVLOG, newEntries) : null,
+    db.setMeta("counters", state.counters),
+  ]);
+  emit();
+
+  return { cardsUpdated: updatedCards.length, reviewsImported: newEntries.length };
+}
+
 /* ------------------------------------------------------------------ merge */
 
 /**

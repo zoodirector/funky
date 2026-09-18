@@ -4,9 +4,10 @@ import { html, mount, on } from "../dom.js";
 import { refresh } from "../router.js";
 import { setFlush, setHeader } from "../shell.js";
 import { confirmDialog } from "../components/dialog.js";
-import { toast } from "../components/toast.js";
+import { toast, toastError } from "../components/toast.js";
 import * as store from "../../core/store.js";
 import { storageEstimate } from "../../core/db.js";
+import { exportLearningState, pickLearningStateFile } from "../../core/backup.js";
 import { applyTheme } from "../theme.js";
 
 const THEMES = [
@@ -107,6 +108,16 @@ export async function render({ outlet }) {
               Everything is stored in this browser only. Clearing site data removes it, so send a
               deck file to a friend now and then — that is your backup.
             </p>
+            <button type="button" class="btn btn-outline btn-block" data-export-learning-state>
+              Export learning state
+            </button>
+            <button type="button" class="btn btn-outline btn-block" data-import-learning-state>
+              Import learning state
+            </button>
+            <p class="text-xs muted">
+              Your review history and scheduling progress, as a JSON file. Deck files never
+              include this — it only makes sense on a device that already has these notes.
+            </p>
           </div>
         </div>
       </div>
@@ -140,6 +151,39 @@ export async function render({ outlet }) {
     on(outlet, "change", "[data-cutoff]", async (event) => {
       await store.updateSettings({ dayCutoffHour: Number(event.target.value) });
       toast("Day rollover updated.");
+    }),
+
+    on(outlet, "click", "[data-export-learning-state]", async () => {
+      const snapshot = await store.learningStateSnapshot();
+      const result = await exportLearningState(snapshot);
+      if (result === "shared") toast("Learning state shared.");
+      if (result === "downloaded") toast("Learning state saved to your downloads.");
+    }),
+
+    on(outlet, "click", "[data-import-learning-state]", async () => {
+      let backup;
+      try {
+        backup = await pickLearningStateFile();
+      } catch (error) {
+        return toastError(error);
+      }
+      if (!backup) return;
+
+      const confirmed = await confirmDialog({
+        title: "Import learning state?",
+        description:
+          "Scheduling progress for any card this backup shares with the decks already on this device is overwritten. Cards from decks you do not have are skipped.",
+        confirmLabel: "Import",
+      });
+      if (!confirmed) return;
+
+      const { cardsUpdated, reviewsImported } = await store.restoreLearningState(backup);
+      toast(
+        cardsUpdated
+          ? `Restored ${cardsUpdated} card${cardsUpdated === 1 ? "" : "s"} and ${reviewsImported} review${reviewsImported === 1 ? "" : "s"}.`
+          : "No matching cards found in that backup."
+      );
+      refresh();
     }),
 
     on(outlet, "click", "[data-reset]", async () => {

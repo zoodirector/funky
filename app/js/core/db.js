@@ -106,6 +106,10 @@ export const put = (store, value) => tx(store, "readwrite", (s) => wrap(s.put(va
 export const putAll = (store, values) =>
   tx(store, "readwrite", (s) => Promise.all(values.map((v) => wrap(s.put(v)))));
 
+/** Insert rows into an auto-incrementing store; callers must not set the key. */
+export const addAll = (store, values) =>
+  tx(store, "readwrite", (s) => Promise.all(values.map((v) => wrap(s.add(v)))));
+
 export const remove = (store, key) => tx(store, "readwrite", (s) => wrap(s.delete(key)));
 
 export const removeAll = (store, keys) =>
